@@ -1,0 +1,123 @@
+Storms and other severe weather events cause both public health and economic.
+========================================================
+Shenda Hong
+# Synopsis
+Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern.
+
+The basic goal of this assignment is to explore the NOAA Storm Database and answer some basic questions about severe weather events. You must use the database to answer the questions below and show the code for your entire analysis. Your analysis can consist of tables, figures, or other summaries. You may use any R package you want to support your analysis.
+
+# Data Processing
+## Reading data and modifying names
+```{r}
+# Loading Data
+setwd("G:\\Learn\\Coursera\\Data Science\\5Reproducible Research\\assignment2")
+data <- read.csv("StormData.csv", sep = ",", na.strings = c("NA", " "), 
+                stringsAsFactors = F)
+names(data)
+# Modifying variable names
+nameList <- names(data)
+nameList <- tolower(make.names(nameList, allow_ = F))
+colnames(data) <- nameList
+names(data)
+```
+## Subseting useful informations
+```{r}
+# Subseting useful informations
+pop <- subset(data, fatalities > 0 | injuries > 0, 
+                c("bgn.date", "evtype", "fatalities", "injuries"))
+# Translating variable into proper types
+pop$evtype <- as.factor(toupper(pop$evtype))
+pop$fatalities <- as.numeric(pop$fatalities)
+pop$injuries <- as.numeric(pop$injuries)
+```
+```{r}
+pop <- subset(pop, fatalities > 0 | injuries > 0, 
+                c("bgn.date", "evtype", "fatalities", "injuries"))
+names(pop)
+summary(pop)
+
+# Subseting useful informations
+eco <- subset(data, propdmg > 0 | cropdmg > 0, 
+              c("bgn.date", "evtype", "propdmg", 
+                "propdmgexp", "cropdmg", "cropdmgexp"))
+```
+```{r}
+# Translating variable into proper types
+eco$evtype <- as.factor(toupper(eco$evtype))
+eco$propdmg <- as.numeric(eco$propdmg)
+eco$cropdmg <- as.numeric(eco$cropdmg)
+eco$propdmgexp <- with(eco, ifelse(propdmgexp %in% 
+                                  c("K", "k", "M", "m", "B"), propdmgexp, 0))
+eco$cropdmgexp <- with(eco, ifelse(cropdmgexp %in% 
+                                      c("K", "k", "M", "m", "B"), cropdmgexp, 0))
+
+eco <- subset(eco, propdmg > 0 | cropdmg > 0, 
+              c("bgn.date", "evtype", "propdmg", 
+                "propdmgexp", "cropdmg", "cropdmgexp"))
+names(eco)
+summary(eco)
+```
+## Calculating actual dmg with dmgexp
+```{r}
+# function return multiplier
+mul <- function(x) {
+    if (x == "K" | x == "k") {
+        y <- 1/1000
+    } else if (x == "B" | x == "b") {
+        y <- 1000
+    } else {
+        y <- 1
+    }
+    y
+}
+# Calculating actual dmg with dmgexp
+eco$propmul <- sapply(eco$propdmgexp, mul)
+eco$cropmul <- sapply(eco$cropdmgexp, mul)
+eco$propdmg1 <- eco$propdmg * eco$propmul
+eco$cropdmg1 <- eco$cropdmg * eco$cropmul
+```
+
+# Results
+## Across the United States, which types of events are most harmful with respect to population health?
+```{r fig.width=12, fig.height=10}
+library(plyr)
+library(ggplot2)
+# Summing fatalities and injuries by evtype
+popSum <- ddply(pop, .(evtype), summarise, fatality.sum = sum(fatalities), 
+    injury.sum = sum(injuries))
+popSum$dmg <- popSum$fatality.sum + popSum$injury.sum
+popTop10 <- popSum[order(popSum$dmg, decreasing = T)[1:10],]
+```
+The rank of events which are the most top 10 harmful with respect to population health is:
+```{r}
+print(popTop10)
+```
+```{r}
+# Plot result
+qplot(reorder(evtype, -dmg), dmg, evtype, data = popTop10,
+      geom = "bar",stat="identity",
+      main = "The most harmful event with respect to population health",
+      xlab = "Types of events", ylab = "Damagement")
+```
+## Across the United States, which types of events have the greatest economic consequences?
+```{r fig.width=12, fig.height=10}
+# Summing propdmg and cropdmg by evtype
+ecoSum <- ddply(eco, .(evtype), summarise, prop.sum = sum(propdmg1), 
+    crop.sum = sum(cropdmg1))
+ecoSum$dmg <- ecoSum$prop.sum + ecoSum$crop.sum
+ecoTop10 <- ecoSum[order(ecoSum$dmg, decreasing = T)[1:10],]
+print(ecoTop10)
+```
+The rank of events which are the most top 10 harmful with respect to population health is:
+```{r}
+print(popTop10)
+```
+```{r}
+# Plot result
+qplot(reorder(evtype, -dmg), dmg, evtype, data = ecoTop10,
+      geom = "bar",stat="identity",
+      main = "The most harmful event with respect to population health",
+      xlab = "Types of events", ylab = "Damagement")
+```
+
+
